@@ -10,13 +10,21 @@
           <el-icon><Monitor /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
+        <el-menu-item index="/assets">
+          <el-icon><Box /></el-icon>
+          <span>资产管理</span>
+        </el-menu-item>
         <el-menu-item index="/scan-results">
           <el-icon><Search /></el-icon>
           <span>扫描结果</span>
         </el-menu-item>
         <el-menu-item index="/security-baseline">
-          <el-icon><Shield /></el-icon>
+          <el-icon><Lock /></el-icon>
           <span>安全基线</span>
+        </el-menu-item>
+        <el-menu-item index="/vulnerability-database">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>漏洞库</span>
         </el-menu-item>
         <el-menu-item index="/reports">
           <el-icon><Document /></el-icon>
@@ -36,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { Monitor, Search, Shield, Document } from '@element-plus/icons-vue'
+import { Monitor, Search, Lock, Document, Box, DataAnalysis } from '@element-plus/icons-vue'
 </script>
 
 <style>

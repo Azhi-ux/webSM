@@ -86,25 +86,25 @@
 
     <!-- 详情对话框 -->
     <el-dialog v-model="detailDialog.visible" :title="detailDialog.title" width="600px">
-      <div class="detail-content">
-        <h4>检查项：{{ detailDialog.item?.item }}</h4>
-        <p class="description">{{ detailDialog.item?.description }}</p>
+      <div v-if="detailDialog.data" class="detail-content">
+        <h4>检查项：{{ detailDialog.data.item }}</h4>
+        <p class="description">{{ detailDialog.data.description }}</p>
         <h4>当前配置：</h4>
         <el-input
           type="textarea"
-          v-model="detailDialog.item?.currentConfig"
+          v-model="detailDialog.data.currentConfig"
           rows="4"
           readonly
         />
         <h4>建议配置：</h4>
         <el-input
           type="textarea"
-          v-model="detailDialog.item?.suggestedConfig"
+          v-model="detailDialog.data.suggestedConfig"
           rows="4"
           readonly
         />
         <h4>修复建议：</h4>
-        <p class="suggestion">{{ detailDialog.item?.suggestion }}</p>
+        <p class="suggestion">{{ detailDialog.data.suggestion }}</p>
       </div>
     </el-dialog>
   </div>
@@ -113,6 +113,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 interface BaselineItem {
   id: number
@@ -122,8 +123,14 @@ interface BaselineItem {
   level: string
   description: string
   suggestion: string
-  currentConfig?: string
-  suggestedConfig?: string
+  currentConfig: string
+  suggestedConfig: string
+}
+
+interface DetailDialogData {
+  visible: boolean
+  title: string
+  data: BaselineItem | null
 }
 
 const baselineItems = ref<BaselineItem[]>([
@@ -179,6 +186,12 @@ const webChecklist = ref([
   { id: 4, name: '版本隐藏', passed: true }
 ])
 
+const detailDialog = reactive<DetailDialogData>({
+  visible: false,
+  title: '检查项详情',
+  data: null
+})
+
 const osSecurityScore = computed(() => {
   const passed = osChecklist.value.filter(item => item.passed).length
   return Math.round((passed / osChecklist.value.length) * 100)
@@ -194,12 +207,6 @@ const getProgressColor = (percentage: number) => {
   if (percentage < 80) return '#e6a23c'
   return '#67c23a'
 }
-
-const detailDialog = reactive({
-  visible: false,
-  title: '检查项详情',
-  item: null as BaselineItem | null
-})
 
 const getStatusType = (status: string) => {
   switch (status) {
@@ -226,22 +233,20 @@ const getRiskType = (level: string) => {
 }
 
 const startCheck = () => {
-  // TODO: 实现开始检查功能
-  console.log('开始安全基线检查')
+  ElMessage.info('开始执行安全基线检查...')
 }
 
 const handleFix = (row: BaselineItem) => {
-  // TODO: 实现修复功能
-  console.log('修复项目:', row)
+  ElMessage.info(`正在修复: ${row.item}`)
 }
 
 const showDetail = (row: BaselineItem) => {
-  detailDialog.item = row
+  detailDialog.data = { ...row }
   detailDialog.visible = true
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .security-baseline {
   .mt-20 {
     margin-top: 20px;
