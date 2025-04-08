@@ -189,60 +189,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, VideoPlay, Edit, Delete } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
+import api from '../api'
+import type { Asset } from '../api/types'
 
 const router = useRouter()
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+const assets = ref<Asset[]>([])
+const assetFormRef = ref<FormInstance>()
 
+// 搜索表单
 const searchForm = reactive({
   name: '',
   type: '',
   status: ''
 })
 
-const assets = ref([
-  {
-    id: 1,
-    name: '示例Web应用',
-    type: 'Web应用',
-    domain: 'example.com',
-    ip: '192.168.1.100',
-    ports: ['80', '443'],
-    technology: 'Vue.js, Node.js, MySQL',
-    owner: '张三',
-    contact: '13800138000',
-    status: '运行中',
-    lastScan: '2024-02-15 10:00:00',
-    notes: '公司主要业务系统'
-  },
-  {
-    id: 2,
-    name: 'API网关',
-    type: 'API服务',
-    domain: 'api.example.com',
-    ip: '192.168.1.101',
-    ports: ['8080', '8443'],
-    technology: 'Spring Cloud Gateway',
-    owner: '李四',
-    contact: '13900139000',
-    status: '运行中',
-    lastScan: '2024-02-15 09:30:00',
-    notes: '微服务API网关'
-  }
-])
-
-const assetDialog = reactive({
-  visible: false,
-  type: 'add'
-})
-
+// 资产表单
 const assetForm = reactive({
   name: '',
   type: '',
@@ -252,9 +222,17 @@ const assetForm = reactive({
   technology: '',
   owner: '',
   contact: '',
-  notes: ''
+  notes: '',
+  status: 'running'
 })
 
+// 对话框状态
+const assetDialog = reactive({
+  visible: false,
+  type: 'add'
+})
+
+// 表单验证规则
 const assetRules: FormRules = {
   name: [
     { required: true, message: '请输入资产名称', trigger: 'blur' }
@@ -264,42 +242,39 @@ const assetRules: FormRules = {
   ],
   domain: [
     { required: true, message: '请输入域名', trigger: 'blur' }
-  ],
-  ip: [
-    { required: true, message: '请输入IP地址', trigger: 'blur' }
-  ],
-  owner: [
-    { required: true, message: '请输入负责人', trigger: 'blur' }
-  ],
-  contact: [
-    { required: true, message: '请输入联系方式', trigger: 'blur' }
   ]
 }
 
-const assetFormRef = ref<FormInstance>()
+// 获取资产列表
+const getAssets = async () => {
+  loading.value = true
+  try {
+    const params = {
+      name: searchForm.name || undefined,
+      type: searchForm.type || undefined,
+      status: searchForm.status || undefined,
+      currentPage: currentPage.value,
+      pageSize: pageSize.value
+    }
 
-const getStatusType = (status: string) => {
-  switch (status) {
-    case '运行中':
-      return 'success'
-    case '已停止':
-      return 'danger'
-    case '维护中':
-      return 'warning'
-    default:
-      return 'info'
+    const response = await api.assets.getList(params)
+    assets.value = response.data.items
+    total.value = response.data.pagination.total
+  } catch (error: any) {
+    console.error('获取资产列表失败:', error)
+    ElMessage.error('获取资产列表失败: ' + error.message)
+  } finally {
+    loading.value = false
   }
 }
 
+// 搜索资产
 const searchAssets = () => {
-  loading.value = true
-  // TODO: 实现资产搜索
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('搜索完成')
-  }, 1000)
+  currentPage.value = 1
+  getAssets()
 }
 
+// 重置搜索
 const resetSearch = () => {
   searchForm.name = ''
   searchForm.type = ''
@@ -307,63 +282,152 @@ const resetSearch = () => {
   searchAssets()
 }
 
+// 添加资产
 const addAsset = () => {
   assetDialog.type = 'add'
   assetDialog.visible = true
+  // 重置表单
   Object.keys(assetForm).forEach(key => {
     if (key === 'ports') {
       assetForm[key] = []
+    } else if (key === 'status') {
+      assetForm[key] = 'running'
     } else {
       assetForm[key] = ''
     }
   })
 }
 
-const editAsset = (row: any) => {
+// 编辑资产
+const editAsset = (row: Asset) => {
   assetDialog.type = 'edit'
   assetDialog.visible = true
-  Object.assign(assetForm, row)
-}
-
-const submitAsset = async (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  
-  await formEl.validate((valid) => {
-    if (valid) {
-      // TODO: 实现资产添加/编辑
-      ElMessage.success(assetDialog.type === 'add' ? '添加成功' : '修改成功')
-      assetDialog.visible = false
+  // 填充表单数据
+  Object.keys(assetForm).forEach(key => {
+    if (key in row) {
+      assetForm[key] = row[key]
     }
   })
 }
 
-const deleteAsset = (row: any) => {
-  ElMessageBox.confirm('确定要删除该资产吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // TODO: 实现资产删除
-    ElMessage.success('删除成功')
+// 提交资产表单
+const submitAsset = async (formEl: FormInstance | undefined) => {
+  if (!formEl) return
+  
+  await formEl.validate(async (valid) => {
+    if (valid) {
+      loading.value = true
+      try {
+        if (assetDialog.type === 'add') {
+          await api.assets.create(assetForm)
+          ElMessage.success('资产添加成功')
+        } else {
+          const editingAsset = assets.value.find(item => item.name === assetForm.name)
+          if (editingAsset) {
+            await api.assets.update(editingAsset.id, assetForm)
+            ElMessage.success('资产更新成功')
+          }
+        }
+        assetDialog.visible = false
+        getAssets()
+      } catch (error: any) {
+        console.error('提交资产失败:', error)
+        ElMessage.error('提交资产失败: ' + error.message)
+      } finally {
+        loading.value = false
+      }
+    }
   })
 }
 
-const startScan = (row: any) => {
-  router.push({
-    path: '/scan-results',
-    query: { target: row.domain }
+// 删除资产
+const deleteAsset = (row: Asset) => {
+  ElMessageBox.confirm(
+    `确定要删除资产"${row.name}"吗?`,
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    loading.value = true
+    try {
+      await api.assets.delete(row.id)
+      ElMessage.success('资产删除成功')
+      getAssets()
+    } catch (error: any) {
+      console.error('删除资产失败:', error)
+      ElMessage.error('删除资产失败: ' + error.message)
+    } finally {
+      loading.value = false
+    }
+  }).catch(() => {
+    // 取消删除
   })
 }
 
+// 开始扫描
+const startScan = (row: Asset) => {
+  ElMessageBox.confirm(
+    `确定要对"${row.name}"开始安全扫描吗?`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'info'
+    }
+  ).then(async () => {
+    loading.value = true
+    try {
+      const options = {
+        scanTypes: ['sql', 'xss', 'cmd'],
+        depth: 2
+      }
+      await api.scans.startScan(row.id, options)
+      ElMessage.success('扫描任务已创建')
+      // 跳转到扫描结果页面
+      router.push('/scan-results')
+    } catch (error: any) {
+      console.error('创建扫描任务失败:', error)
+      ElMessage.error('创建扫描任务失败: ' + error.message)
+    } finally {
+      loading.value = false
+    }
+  }).catch(() => {
+    // 取消扫描
+  })
+}
+
+// 分页相关
 const handleSizeChange = (val: number) => {
   pageSize.value = val
-  searchAssets()
+  getAssets()
 }
 
 const handleCurrentChange = (val: number) => {
   currentPage.value = val
-  searchAssets()
+  getAssets()
 }
+
+// 辅助函数
+const getStatusType = (status: string) => {
+  switch (status) {
+    case 'running':
+      return 'success'
+    case 'maintenance':
+      return 'warning'
+    case 'stopped':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+// 组件挂载时获取资产列表
+onMounted(() => {
+  getAssets()
+})
 </script>
 
 <style scoped lang="scss">
