@@ -1,0 +1,162 @@
+-- 用户表
+CREATE TABLE `users` (
+  `id` varchar(36) NOT NULL COMMENT '用户ID',
+  `email` varchar(255) NOT NULL COMMENT '用户邮箱',
+  `password_hash` varchar(255) NOT NULL COMMENT '密码哈希',
+  `name` varchar(50) DEFAULT NULL COMMENT '用户名称',
+  `avatar_url` varchar(255) DEFAULT NULL COMMENT '头像URL',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户信息表';
+
+-- 资产表
+CREATE TABLE `assets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '资产ID',
+  `name` varchar(100) NOT NULL COMMENT '资产名称',
+  `type` enum('web','api','mobile','miniapp') NOT NULL COMMENT '资产类型',
+  `domain` varchar(255) DEFAULT NULL COMMENT '域名',
+  `ip` varchar(50) DEFAULT NULL COMMENT 'IP地址',
+  `ports` varchar(255) DEFAULT NULL COMMENT '开放端口，逗号分隔',
+  `technology` varchar(255) DEFAULT NULL COMMENT '技术栈',
+  `owner` varchar(50) DEFAULT NULL COMMENT '负责人',
+  `contact` varchar(100) DEFAULT NULL COMMENT '联系方式',
+  `status` enum('running','stopped','maintenance') NOT NULL DEFAULT 'running' COMMENT '状态',
+  `last_scan` timestamp NULL DEFAULT NULL COMMENT '最近扫描时间',
+  `notes` text DEFAULT NULL COMMENT '备注',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_name` (`name`),
+  KEY `idx_type` (`type`),
+  KEY `idx_domain` (`domain`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产信息表';
+
+-- 漏洞库表
+CREATE TABLE `vulnerabilities` (
+  `id` varchar(20) NOT NULL COMMENT '漏洞编号',
+  `name` varchar(255) NOT NULL COMMENT '漏洞名称',
+  `type` varchar(50) NOT NULL COMMENT '漏洞类型',
+  `risk` enum('high','medium','low') NOT NULL COMMENT '风险等级',
+  `description` text NOT NULL COMMENT '漏洞描述',
+  `affects` text DEFAULT NULL COMMENT '影响范围',
+  `solution` text DEFAULT NULL COMMENT '修复建议',
+  `references` text DEFAULT NULL COMMENT '参考链接，JSON格式',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_name` (`name`),
+  KEY `idx_type` (`type`),
+  KEY `idx_risk` (`risk`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='漏洞库表';
+
+-- 扫描任务表
+CREATE TABLE `scan_tasks` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+  `target` varchar(255) NOT NULL COMMENT '扫描目标',
+  `scan_types` varchar(255) NOT NULL COMMENT '扫描类型，逗号分隔',
+  `depth` tinyint(1) NOT NULL DEFAULT 1 COMMENT '扫描深度',
+  `status` enum('pending','running','completed','failed') NOT NULL DEFAULT 'pending' COMMENT '任务状态',
+  `start_time` timestamp NULL DEFAULT NULL COMMENT '开始时间',
+  `end_time` timestamp NULL DEFAULT NULL COMMENT '结束时间',
+  `asset_id` int(11) DEFAULT NULL COMMENT '关联资产ID',
+  `created_by` varchar(36) NOT NULL COMMENT '创建者ID',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_target` (`target`),
+  KEY `idx_status` (`status`),
+  KEY `idx_asset_id` (`asset_id`),
+  KEY `idx_created_by` (`created_by`),
+  CONSTRAINT `fk_scan_tasks_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_scan_tasks_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='扫描任务表';
+
+-- 扫描结果表
+CREATE TABLE `scan_results` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '结果ID',
+  `scan_task_id` int(11) NOT NULL COMMENT '扫描任务ID',
+  `vulnerability_id` varchar(20) DEFAULT NULL COMMENT '漏洞ID',
+  `url` varchar(255) DEFAULT NULL COMMENT '发现漏洞的URL',
+  `parameter` varchar(100) DEFAULT NULL COMMENT '参数',
+  `risk` enum('high','medium','low','info') NOT NULL COMMENT '风险等级',
+  `description` text DEFAULT NULL COMMENT '描述',
+  `proof` text DEFAULT NULL COMMENT '漏洞证明',
+  `fix_suggestion` text DEFAULT NULL COMMENT '修复建议',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_scan_task_id` (`scan_task_id`),
+  KEY `idx_vulnerability_id` (`vulnerability_id`),
+  KEY `idx_risk` (`risk`),
+  CONSTRAINT `fk_scan_results_task` FOREIGN KEY (`scan_task_id`) REFERENCES `scan_tasks` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_scan_results_vulnerability` FOREIGN KEY (`vulnerability_id`) REFERENCES `vulnerabilities` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='扫描结果表';
+
+-- 安全基线表
+CREATE TABLE `security_baselines` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '基线ID',
+  `name` varchar(100) NOT NULL COMMENT '基线名称',
+  `category` varchar(50) NOT NULL COMMENT '分类',
+  `description` text NOT NULL COMMENT '描述',
+  `check_items` text NOT NULL COMMENT '检查项，JSON格式',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_name` (`name`),
+  KEY `idx_category` (`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='安全基线表';
+
+-- 基线检查任务表
+CREATE TABLE `baseline_checks` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '检查ID',
+  `asset_id` int(11) NOT NULL COMMENT '资产ID',
+  `baseline_id` int(11) NOT NULL COMMENT '基线ID',
+  `status` enum('pending','running','completed','failed') NOT NULL DEFAULT 'pending' COMMENT '状态',
+  `result` json DEFAULT NULL COMMENT '检查结果，JSON格式',
+  `score` int(11) DEFAULT NULL COMMENT '得分',
+  `start_time` timestamp NULL DEFAULT NULL COMMENT '开始时间',
+  `end_time` timestamp NULL DEFAULT NULL COMMENT '结束时间',
+  `created_by` varchar(36) NOT NULL COMMENT '创建者ID',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_asset_id` (`asset_id`),
+  KEY `idx_baseline_id` (`baseline_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_created_by` (`created_by`),
+  CONSTRAINT `fk_baseline_checks_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_baseline_checks_baseline` FOREIGN KEY (`baseline_id`) REFERENCES `security_baselines` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_baseline_checks_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='基线检查任务表';
+
+-- 报告表
+CREATE TABLE `reports` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '报告ID',
+  `title` varchar(255) NOT NULL COMMENT '报告标题',
+  `type` enum('scan','baseline','custom') NOT NULL COMMENT '报告类型',
+  `content` longtext DEFAULT NULL COMMENT '报告内容，HTML或JSON格式',
+  `scan_task_id` int(11) DEFAULT NULL COMMENT '关联的扫描任务ID',
+  `baseline_check_id` int(11) DEFAULT NULL COMMENT '关联的基线检查ID',
+  `created_by` varchar(36) NOT NULL COMMENT '创建者ID',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_title` (`title`),
+  KEY `idx_type` (`type`),
+  KEY `idx_scan_task_id` (`scan_task_id`),
+  KEY `idx_baseline_check_id` (`baseline_check_id`),
+  KEY `idx_created_by` (`created_by`),
+  CONSTRAINT `fk_reports_scan_task` FOREIGN KEY (`scan_task_id`) REFERENCES `scan_tasks` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_reports_baseline_check` FOREIGN KEY (`baseline_check_id`) REFERENCES `baseline_checks` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_reports_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报告表';
+
+users - 用户信息表，存储用户账号信息
+assets - 资产信息表，存储各种资产（Web应用、API服务等）的信息
+vulnerabilities - 漏洞库表，存储各种已知漏洞的信息
+scan_tasks - 扫描任务表，记录漏洞扫描任务信息
+scan_results - 扫描结果表，记录扫描发现的具体漏洞
+security_baselines - 安全基线表，存储安全基线检查标准
+baseline_checks - 基线检查任务表，记录安全基线检查任务和结果
+reports - 报告表，存储生成的扫描报告和基线检查报告

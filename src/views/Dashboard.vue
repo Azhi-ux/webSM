@@ -106,14 +106,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { Doughnut, Bar } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 
+// 注册Chart.js组件
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+
+// 添加错误处理
+onMounted(() => {
+  try {
+    console.log('Dashboard component mounted')
+  } catch (error) {
+    console.error('Dashboard mount error:', error)
+  }
+})
 
 const loading = ref(false)
 const scanFormRef = ref<FormInstance>()
